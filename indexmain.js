@@ -60,8 +60,8 @@ async function safeFetch(url, options = {}, retries = 5) {
 }
 
 // Read and parse wallets from wallets.json file
-const walletsData = JSON.parse(readFileSync('./wallets.json', 'utf8'));
-console.log(`📁 Loaded ${walletsData.length} wallets from wallets.json`);
+const walletsData = JSON.parse(readFileSync('./walletsmain.json', 'utf8'));
+console.log(`📁 Loaded ${walletsData.length} wallets from walletsmain.json`);
 
 // Initialize reporting data structure
 const transferReport = {
