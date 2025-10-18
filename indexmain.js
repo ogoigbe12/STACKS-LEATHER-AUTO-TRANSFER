@@ -96,14 +96,30 @@ async function sendStxFromWallet(walletData, walletIndex) {
         error: null
     };
 
-    // Generate wallet from mnemonic phrase (the privateKey field contains the mnemonic)
-    const wallet = await generateWallet({
-        secretKey: walletData.privateKey,  // The mnemonic phrase from wallets.json
-        password: ''                       // Empty password for simplicity
-    });
+    // Validate mnemonic phrase
+    if (!walletData.privateKey || walletData.privateKey.trim() === '') {
+        console.error('🚨 Skipping wallet: Empty or invalid mnemonic phrase');
+        walletReport.error = 'Empty or invalid mnemonic phrase';
+        transferReport.wallets.push(walletReport);
+        return;
+    }
 
-    // Extract the private key from the first account in the wallet
-    const PRIVATE_KEY = wallet.accounts[0].stxPrivateKey;
+    let PRIVATE_KEY;
+    try {
+        // Generate wallet from mnemonic phrase (the privateKey field contains the mnemonic)
+        const wallet = await generateWallet({
+            secretKey: walletData.privateKey,  // The mnemonic phrase from wallets.json
+            password: ''                       // Empty password for simplicity
+        });
+
+        // Extract the private key from the first account in the wallet
+        PRIVATE_KEY = wallet.accounts[0].stxPrivateKey;
+    } catch (error) {
+        console.error('🚨 Invalid mnemonic phrase:', error.message);
+        walletReport.error = `Invalid mnemonic phrase: ${error.message}`;
+        transferReport.wallets.push(walletReport);
+        return;
+    }
 
     // Derive the sender's Stacks address from the private key
     const senderAddress = getAddressFromPrivateKey(PRIVATE_KEY, TransactionVersion.Mainnet);
@@ -234,31 +250,41 @@ async function checkWalletBalances() {
     for (let i = 0; i < walletsData.length; i++) {
         const walletData = walletsData[i];
 
-        // Generate wallet from mnemonic phrase
-        const wallet = await generateWallet({
-            secretKey: walletData.privateKey,
-            password: ''
-        });
+        // Skip wallets with empty mnemonic phrases
+        if (!walletData.privateKey || walletData.privateKey.trim() === '') {
+            console.log(`⚠️ Skipping wallet ${walletData.name}: Empty mnemonic phrase`);
+            continue;
+        }
 
-        const PRIVATE_KEY = wallet.accounts[0].stxPrivateKey;
-        const senderAddress = getAddressFromPrivateKey(PRIVATE_KEY, TransactionVersion.Mainnet);
+        try {
+            // Generate wallet from mnemonic phrase
+            const wallet = await generateWallet({
+                secretKey: walletData.privateKey,
+                password: ''
+            });
 
-        // Fetch current STX balance with retry
-        const headers = API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {};
-        const response = await safeFetch(`${NETWORK.coreApiUrl}/extended/v1/address/${senderAddress}/balances`, { headers });
-        const accountInfo = await response.json();
-        const currentBalance = BigInt(accountInfo.stx.balance);
-        grandTotal += currentBalance;
+            const PRIVATE_KEY = wallet.accounts[0].stxPrivateKey;
+            const senderAddress = getAddressFromPrivateKey(PRIVATE_KEY, TransactionVersion.Mainnet);
 
-        console.log(`🧑 Wallet: ${walletData.name} | Balance: ${Number(currentBalance) / 1000000} STX`);
+            // Fetch current STX balance with retry
+            const headers = API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {};
+            const response = await safeFetch(`${NETWORK.coreApiUrl}/extended/v1/address/${senderAddress}/balances`, { headers });
+            const accountInfo = await response.json();
+            const currentBalance = BigInt(accountInfo.stx.balance);
+            grandTotal += currentBalance;
 
-        // ✅ Add small delay to avoid hitting rate limits
-        await delay(2000);
+            console.log(`🧑 Wallet: ${walletData.name} | Balance: ${Number(currentBalance) / 1000000} STX`);
+
+            // ✅ Add small delay to avoid hitting rate limits
+            await delay(2000);
+        } catch (error) {
+            console.error(`⚠️ Error processing wallet ${walletData.name}:`, error.message);
+        }
     }
 
     console.log(`\n💰 GRAND TOTAL BALANCE FOR ALL WALLETS: ${Number(grandTotal) / 1000000} STX`);
 }
 
 // ✅ Choose one function to run
-//processAllWallets();
-checkWalletBalances();
+processAllWallets();
+// checkWalletBalances();
