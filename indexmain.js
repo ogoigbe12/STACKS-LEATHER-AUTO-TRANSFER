@@ -286,5 +286,5 @@ async function checkWalletBalances() {
 }
 
 // ✅ Choose one function to run
-processAllWallets();
-// checkWalletBalances();
+// processAllWallets();
+checkWalletBalances();
